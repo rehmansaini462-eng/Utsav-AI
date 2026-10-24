@@ -99,10 +99,14 @@ export function EventForm({
       const plan: EventPlan = (result.data || result) as EventPlan;
       onPlanGenerated(plan);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Network error. Failed to reach celebration planning server.";
+      let msg: string;
+      if (err instanceof TypeError) {
+        msg = "Network error. Please check your internet connection and try again.";
+      } else if (err instanceof Error) {
+        msg = err.message;
+      } else {
+        msg = "Network error. Please check your internet connection and try again.";
+      }
       setApiError(msg);
       onError?.(msg);
     } finally {

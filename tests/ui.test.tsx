@@ -202,6 +202,35 @@ describe("Day 2: UI, Dashboard & Accessibility Tests", () => {
         expect(onErrorMock).toHaveBeenCalledWith("AI generation failed. Please try again.");
       });
     });
+
+    it("should handle network TypeError gracefully with offline error message and reset loading state", async () => {
+      const user = userEvent.setup();
+      const onPlanGeneratedMock = vi.fn();
+      const onErrorMock = vi.fn();
+
+      // Mock fetch throwing TypeError (simulating offline mode)
+      global.fetch = vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+      render(<EventForm onPlanGenerated={onPlanGeneratedMock} onError={onErrorMock} />);
+
+      const submitButton = screen.getByRole("button", { name: /Generate Celebration Plan/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        const alert = screen.getByRole("alert");
+        expect(alert).toBeDefined();
+        expect(alert.textContent).toContain(
+          "Network error. Please check your internet connection and try again.",
+        );
+        expect(onPlanGeneratedMock).not.toHaveBeenCalled();
+        expect(onErrorMock).toHaveBeenCalledWith(
+          "Network error. Please check your internet connection and try again.",
+        );
+      });
+
+      // Loading state must be reset and button clickable again
+      expect(submitButton.hasAttribute("disabled")).toBe(false);
+    });
   });
 
   describe("2. PlanDashboard Component & Full WAI-ARIA Tab Accessibility", () => {
