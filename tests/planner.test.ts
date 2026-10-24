@@ -11,10 +11,17 @@ vi.mock("@/lib/gemini", () => {
       this.name = "GeminiTimeoutError";
     }
   }
+  class RateLimitError extends Error {
+    constructor(message: string = "Gemini API quota exceeded. Please try again later.") {
+      super(message);
+      this.name = "RateLimitError";
+    }
+  }
   return {
     generateJSON: vi.fn(),
     cleanJsonResponse: vi.fn((str: string) => str),
     GeminiTimeoutError,
+    RateLimitError,
   };
 });
 
@@ -439,6 +446,31 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       expect(data.budgetBreakdown).toBeUndefined();
       expect(data.timeline).toBeUndefined();
       expect(data.personalizedIdeas).toBeUndefined();
+    });
+
+    it("should return HTTP 429 when Gemini AI quota is exceeded (RateLimitError)", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: true,
+        limit: 10,
+        remaining: 7,
+        reset: Date.now() + 60000,
+      });
+
+      const error = new Error("Gemini API quota exceeded. Please try again later.");
+      error.name = "RateLimitError";
+      vi.mocked(generateJSON).mockRejectedValueOnce(error);
+
+      const request = new Request("http://localhost:3000/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(data.error).toBe("Gemini API quota exceeded. Please try again later.");
     });
   });
 });

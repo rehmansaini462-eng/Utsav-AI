@@ -37,6 +37,16 @@ export class GeminiTimeoutError extends Error {
 }
 
 /**
+ * Error thrown when Gemini AI API quota or rate limit is exceeded.
+ */
+export class RateLimitError extends Error {
+  constructor(message: string = "Gemini API quota exceeded. Please try again later.") {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
+/**
  * Strictly dynamic Generative AI invocation that guarantees structured JSON output
  * validated against a runtime Zod schema.
  *
@@ -49,6 +59,7 @@ export class GeminiTimeoutError extends Error {
  * @param schema - Zod validation schema for parsing and guaranteeing output integrity
  * @param options - Optional configuration such as custom timeoutMs
  * @returns The strongly typed, schema-validated object
+ * @throws RateLimitError if Gemini API quota (429) is exceeded
  * @throws GeminiTimeoutError if AI generation exceeds timeout
  * @throws Error if Gemini API invocation, JSON parsing, or Zod validation fails across all fallback models
  */
@@ -79,6 +90,7 @@ export async function generateJSON<T>(
           generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.7,
+            maxOutputTokens: 2048,
           },
         });
 
@@ -97,6 +109,18 @@ export async function generateJSON<T>(
         return schema.parse(parsed);
       } catch (error: unknown) {
         lastError = error;
+
+        // Explicitly check if 429 status or message contains quota to abort immediately
+        const isQuotaOrRateLimit =
+          (error as { status?: number })?.status === 429 ||
+          (error instanceof Error &&
+            (error.message.toLowerCase().includes("quota") ||
+              error.message.includes("429") ||
+              error.name === "RateLimitError"));
+
+        if (isQuotaOrRateLimit) {
+          throw new RateLimitError("Gemini API quota exceeded. Please try again later.");
+        }
 
         // If timed out or aborted, stop fallback loop immediately
         if (
@@ -118,6 +142,9 @@ export async function generateJSON<T>(
 
     throw lastError || new Error("All Gemini fallback models failed to generate valid response.");
   } catch (error: unknown) {
+    if (error instanceof RateLimitError) {
+      throw error;
+    }
     if (
       controller.signal.aborted ||
       error instanceof GeminiTimeoutError ||

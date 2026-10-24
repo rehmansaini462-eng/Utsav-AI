@@ -22,53 +22,41 @@ export function buildEventPlanPrompt(data: EventPlanPromptInput): string {
     .map((item) => `- ${item.category}: ${item.amount} (${item.percentage}%)`)
     .join("\n");
 
-  return `You are the master celebration planner and AI architect for Utsav AI, the premier intelligent Indian & global event planning platform.
-
-Plan a comprehensive, culturally rich, and highly practical event based on the following verified specifications:
+  return `You are the event planner for Utsav AI. Generate a concise, practical celebration plan:
 
 === EVENT SPECIFICATIONS ===
 - Event Type: ${data.eventType}
 - Total Budget: ${data.budget}
 - Guest Count: ${data.guestCount}
 - Location: ${data.location}
-- User Preferences / Notes: ${data.preferences?.trim() ? data.preferences.trim() : "None provided. Apply culturally vibrant best practices for " + data.location + "."}
+- User Preferences: ${data.preferences?.trim() ? data.preferences.trim() : "Culturally authentic celebration for " + data.location}
 
 === ALGORITHMIC BASE BUDGET ANCHOR ===
-The algorithmic engine has computed the following baseline distribution:
 ${budgetTable}
 
-Use this financial allocation as your foundational guide. Tailor the specific categories, amounts, and percentages realistically for a ${data.eventType} in ${data.location} with ${data.guestCount} guests. Ensure the sum of amounts strictly aligns with the total budget of ${data.budget}.
-
 === REQUIRED OUTPUT STRUCTURE (JSON ONLY) ===
-You must generate a single, strictly valid JSON object matching this exact schema:
 {
   "budgetBreakdown": [
-    {
-      "category": "string (e.g., Catering & Beverages, Venue & Logistics, Decor & Styling, Miscellaneous)",
-      "amount": number (exact numerical value),
-      "percentage": number (numerical percentage, e.g. 40)
-    }
+    { "category": "Catering", "amount": 0, "percentage": 40 },
+    { "category": "Venue", "amount": 0, "percentage": 30 },
+    { "category": "Decor", "amount": 0, "percentage": 15 },
+    { "category": "Miscellaneous", "amount": 0, "percentage": 15 }
   ],
   "timeline": [
-    {
-      "phase": "string (e.g., 8-12 Weeks Before, 4 Weeks Before, Week of Event, Event Day)",
-      "tasks": ["string (actionable, detailed task)"]
-    }
+    { "phase": "string", "tasks": ["string"] }
   ],
   "vendorChecklist": [
-    {
-      "vendorType": "string (e.g., Caterer, Decorator/Florist, Photographer/Cinematographer, Sound & Lights)",
-      "questionsToAsk": ["string (critical vetting question)"]
-    }
+    { "vendorType": "string", "questionsToAsk": ["string"] }
   ],
-  "personalizedIdeas": [
-    "string (at least 3 unique, innovative, culturally resonant ideas specifically customized for this celebration)"
-  ]
+  "personalizedIdeas": ["string"]
 }
 
 === CRITICAL RULES ===
-1. STRICT JSON ONLY: Output ONLY the raw JSON object. Do NOT enclose in markdown code blocks (\`\`\`json or \`\`\`). Do NOT include any conversational prefix, explanations, or commentary.
-2. PERSONALIZED IDEAS: Provide at least 3 distinct, creative, and memorable ideas reflecting the celebration atmosphere of ${data.eventType} in ${data.location}.
-3. REALISTIC & PRACTICAL: All vendor questions, timeline milestones, and budget items must reflect real-world event coordination standards.
-4. STRICT LENGTH LIMIT (<500 WORDS TOTAL): Be concise, direct, and punchy. To minimize generation latency and prevent timeouts, do not generate excessively long text for ideas or vendor questions. Keep the total content strictly under 500 words.`;
+1. STRICT JSON ONLY: Return raw JSON only. Do NOT use markdown code blocks (\`\`\`json or \`\`\`). No conversational text.
+2. BRIEF DESCRIPTIONS: Keep all descriptions brief (max 1 sentence per item).
+3. OUTPUT LIMITS:
+   - max 3 timeline phases (1-2 short tasks per phase)
+   - max 3 vendor questions (across vendors)
+   - exactly 3 personalizedIdeas (max 3 ideas, 1 sentence each)
+4. TOTAL BUDGET ALIGNMENT: budgetBreakdown amounts must sum exactly to ${data.budget}.`;
 }

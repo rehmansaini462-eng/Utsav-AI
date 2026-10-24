@@ -6,7 +6,7 @@ import { checkRateLimit } from "@/lib/utils/rateLimit";
 import { EventRequestSchema, EventPlanSchema } from "@/types/planner";
 import { calculateBaseBudget } from "@/lib/utils/budgetLogic";
 import { buildEventPlanPrompt } from "@/lib/prompts/planner";
-import { generateJSON, GeminiTimeoutError } from "@/lib/gemini";
+import { generateJSON, GeminiTimeoutError, RateLimitError } from "@/lib/gemini";
 
 /**
  * ============================================================================
@@ -110,6 +110,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   } catch (error: unknown) {
     console.error("[generate-plan] Dynamic AI generation failed:", error);
+
+    const isRateLimit =
+      error instanceof RateLimitError ||
+      (error instanceof Error &&
+        (error.name === "RateLimitError" ||
+          error.message === "Gemini API quota exceeded. Please try again later." ||
+          error.message.toLowerCase().includes("gemini api quota exceeded")));
+
+    if (isRateLimit) {
+      return NextResponse.json(
+        { error: "Gemini API quota exceeded. Please try again later." },
+        { status: 429 },
+      );
+    }
 
     const isTimeout =
       error instanceof GeminiTimeoutError ||
