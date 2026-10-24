@@ -59,6 +59,7 @@ describe("Day 2: UI, Dashboard & Accessibility Tests", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe("1. EventForm Component & Accessibility", () => {
@@ -230,6 +231,38 @@ describe("Day 2: UI, Dashboard & Accessibility Tests", () => {
 
       // Loading state must be reset and button clickable again
       expect(submitButton.hasAttribute("disabled")).toBe(false);
+    });
+
+    it("should abort with TimeoutError and display network timeout alert when request hangs beyond 15s", async () => {
+      vi.useFakeTimers();
+      const onPlanGeneratedMock = vi.fn();
+      const onErrorMock = vi.fn();
+
+      // Mock fetch that hangs indefinitely (never resolves, simulating Wi-Fi disconnect)
+      global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+
+      render(<EventForm onPlanGenerated={onPlanGeneratedMock} onError={onErrorMock} />);
+
+      const submitButton = screen.getByRole("button", { name: /Generate Celebration Plan/i });
+      fireEvent.click(submitButton);
+
+      // Advance timers by 15 seconds to trigger timeout abort
+      await vi.advanceTimersByTimeAsync(15000);
+
+      const alert = screen.getByRole("alert");
+      expect(alert).toBeDefined();
+      expect(alert.textContent).toContain(
+        "Network timeout. Please check your internet connection and try again.",
+      );
+      expect(onPlanGeneratedMock).not.toHaveBeenCalled();
+      expect(onErrorMock).toHaveBeenCalledWith(
+        "Network timeout. Please check your internet connection and try again.",
+      );
+
+      // Loading state must be reset and button clickable again
+      expect(submitButton.hasAttribute("disabled")).toBe(false);
+
+      vi.useRealTimers();
     });
   });
 

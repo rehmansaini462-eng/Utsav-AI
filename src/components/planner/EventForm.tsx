@@ -21,6 +21,13 @@ export interface EventFormProps {
   isLoading?: boolean;
 }
 
+export class TimeoutError extends Error {
+  constructor(message = "Network timeout. Please check your internet connection and try again.") {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
+
 /**
  * EventForm Component
  * Accessible client-side celebration planning form powered by react-hook-form
@@ -59,14 +66,31 @@ export function EventForm({
     setInternalLoading(true);
     onLoadingChange?.(true);
 
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(
+          new TimeoutError("Network timeout. Please check your internet connection and try again."),
+        );
+      }, 15000);
+    });
+    // Prevent unhandled rejection warning if fetch settles first
+    timeoutPromise.catch(() => {});
+
     try {
-      const response = await fetch("/api/generate-plan", {
+      const fetchPromise = fetch("/api/generate-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
 
       let result: Partial<EventPlan> & { error?: string; data?: EventPlan } = {};
       try {
@@ -100,7 +124,14 @@ export function EventForm({
       onPlanGenerated(plan);
     } catch (err: unknown) {
       let msg: string;
-      if (err instanceof TypeError) {
+      const errorName = (err as { name?: string })?.name;
+      if (
+        err instanceof TimeoutError ||
+        errorName === "TimeoutError" ||
+        errorName === "AbortError"
+      ) {
+        msg = "Network timeout. Please check your internet connection and try again.";
+      } else if (err instanceof TypeError) {
         msg = "Network error. Please check your internet connection and try again.";
       } else if (err instanceof Error) {
         msg = err.message;
@@ -110,6 +141,9 @@ export function EventForm({
       setApiError(msg);
       onError?.(msg);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setInternalLoading(false);
       onLoadingChange?.(false);
     }
