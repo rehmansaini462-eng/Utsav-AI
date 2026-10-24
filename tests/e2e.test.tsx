@@ -205,9 +205,12 @@ describe("End-to-End User Journeys (E2E Integration & Zero-Mock Policy)", () => 
 
     // Assert the rate limit alert is surfaced
     await waitFor(() => {
-      const alert = screen.getByRole("alert");
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts.length).toBeGreaterThan(0);
+      const alert = alerts.find((a) =>
+        a.textContent?.includes("Rate limit exceeded. Please wait."),
+      );
       expect(alert).toBeDefined();
-      expect(alert.textContent).toContain("Rate limit exceeded. Please wait.");
     });
 
     // STRICT ZERO MOCK CHECK:
@@ -239,10 +242,14 @@ describe("End-to-End User Journeys (E2E Integration & Zero-Mock Policy)", () => 
 
     // Assert the specific timeout error alert is displayed
     await waitFor(() => {
-      const alert = screen.getByRole("alert");
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts.length).toBeGreaterThan(0);
+      const alert = alerts.find((a) =>
+        a.textContent?.includes("Zero mock fallback policy is active"),
+      );
       expect(alert).toBeDefined();
-      expect(alert.textContent).toContain("AI generation timed out. Please try again.");
-      expect(alert.textContent).toContain("Zero mock fallback policy is active");
+      expect(alert?.textContent).toContain("AI generation timed out. Please try again.");
+      expect(alert?.textContent).toContain("Zero mock fallback policy is active");
     });
 
     // STRICT ZERO MOCK CHECK:

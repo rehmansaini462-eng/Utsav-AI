@@ -13,11 +13,13 @@ import { EventPlan } from "@/types/planner";
 export default function Home() {
   const [plan, setPlan] = useState<EventPlan | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [politeAnnouncement, setPoliteAnnouncement] = useState<string>("");
   const [assertiveAnnouncement, setAssertiveAnnouncement] = useState<string>("");
 
   const handlePlanGenerated = (generatedPlan: EventPlan) => {
     setPlan(generatedPlan);
+    setApiError(null);
     setAssertiveAnnouncement("");
     setPoliteAnnouncement(
       "Your personalized celebration plan has been successfully generated and is now displayed.",
@@ -25,12 +27,14 @@ export default function Home() {
   };
 
   const handleError = (errorMsg: string) => {
+    setApiError(errorMsg);
     setPoliteAnnouncement("");
     setAssertiveAnnouncement(`Planning error occurred: ${errorMsg}`);
   };
 
   const handleReset = () => {
     setPlan(null);
+    setApiError(null);
     setPoliteAnnouncement("Celebration plan reset. You can now configure a new event.");
   };
 
@@ -125,16 +129,27 @@ export default function Home() {
 
         {/* Dynamic Display Area */}
         <div className="mx-auto max-w-4xl">
-          {isLoading && <LoadingSkeleton />}
-
-          {!isLoading && !plan && (
+          {!plan && (
             <div className="space-y-10">
+              {/* Visual Error Alert */}
+              {apiError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="relative rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700"
+                >
+                  {apiError}
+                </div>
+              )}
+
               <EventForm
                 onPlanGenerated={handlePlanGenerated}
-                onError={handleError}
+                onError={(msg) => setApiError(msg)}
                 onLoadingChange={setIsLoading}
                 isLoading={isLoading}
               />
+
+              {isLoading && <LoadingSkeleton />}
 
               {/* Informative Feature Cards */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -180,7 +195,7 @@ export default function Home() {
             </div>
           )}
 
-          {!isLoading && plan && <PlanDashboard plan={plan} onReset={handleReset} />}
+          {plan && <PlanDashboard plan={plan} onReset={handleReset} />}
         </div>
       </main>
 
