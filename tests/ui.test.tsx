@@ -233,7 +233,7 @@ describe("Day 2: UI, Dashboard & Accessibility Tests", () => {
       expect(submitButton.hasAttribute("disabled")).toBe(false);
     });
 
-    it("should abort with TimeoutError and display network timeout alert when request hangs beyond 15s", async () => {
+    it("should abort with TimeoutError and display network timeout alert when request hangs beyond 45s", async () => {
       vi.useFakeTimers();
       const onPlanGeneratedMock = vi.fn();
       const onErrorMock = vi.fn();
@@ -246,8 +246,8 @@ describe("Day 2: UI, Dashboard & Accessibility Tests", () => {
       const submitButton = screen.getByRole("button", { name: /Generate Celebration Plan/i });
       fireEvent.click(submitButton);
 
-      // Advance timers by 15 seconds to trigger timeout abort
-      await vi.advanceTimersByTimeAsync(15000);
+      // Advance timers by 45 seconds to trigger timeout abort
+      await vi.advanceTimersByTimeAsync(45000);
 
       const alert = screen.getByRole("alert");
       expect(alert).toBeDefined();

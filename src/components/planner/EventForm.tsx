@@ -75,7 +75,7 @@ export function EventForm({
         reject(
           new TimeoutError("Network timeout. Please check your internet connection and try again."),
         );
-      }, 15000);
+      }, 45000);
     });
     // Prevent unhandled rejection warning if fetch settles first
     timeoutPromise.catch(() => {});
@@ -448,7 +448,7 @@ export function EventForm({
             {isLoading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                <span>Generating Plan with Gemini 2.5...</span>
+                <span>Generating your custom plan... This may take up to 30 seconds.</span>
               </>
             ) : (
               <>
@@ -457,6 +457,11 @@ export function EventForm({
               </>
             )}
           </button>
+          {isLoading && (
+            <p className="mt-2.5 animate-pulse text-center text-xs font-medium text-amber-700 dark:text-amber-300">
+              Generating your custom plan... This may take up to 30 seconds.
+            </p>
+          )}
         </div>
       </form>
     </div>

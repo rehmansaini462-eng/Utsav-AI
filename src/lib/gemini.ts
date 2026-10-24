@@ -42,7 +42,7 @@ export class GeminiTimeoutError extends Error {
  *
  * ZERO CACHING: Every call hits the Gemini API live in real-time.
  * ZERO MOCK DATA: Never falls back to static fixtures or mock payloads.
- * STRICT TIMEOUT: Enforces a 15-second AbortController timeout to prevent Vercel execution timeouts.
+ * STRICT TIMEOUT: Enforces a 40-second AbortController timeout to prevent Vercel execution timeouts.
  * MODEL FALLBACK: Tries models in MODELS sequence if an alias fails (404/500).
  *
  * @param prompt - Formatted system and user prompt
@@ -57,7 +57,7 @@ export async function generateJSON<T>(
   schema: z.ZodType<T>,
   options?: { timeoutMs?: number },
 ): Promise<T> {
-  const timeoutMs = options?.timeoutMs ?? 15000;
+  const timeoutMs = options?.timeoutMs ?? 40000;
   const genAI = getGeminiClient();
 
   const controller = new AbortController();
