@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/utils/rateLimit";
 import { EventRequestSchema, EventPlanSchema } from "@/types/planner";
