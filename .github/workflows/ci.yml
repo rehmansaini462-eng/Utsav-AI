@@ -1,0 +1,53 @@
+name: Production CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  HUSKY: "0"
+  CI: "true"
+  SKIP_ENV_VALIDATION: "true"
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'ci_dummy_gemini_api_key' }}
+  UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL || 'https://dummy-redis.upstash.io' }}
+  UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN || 'ci_dummy_upstash_token' }}
+
+jobs:
+  quality-gate:
+    name: Code Quality & Build Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Code Formatting Check (Prettier)
+        run: npm run format:check
+
+      - name: Code Quality & Linting (ESLint)
+        run: npm run lint
+
+      - name: Strict Type Checking (TypeScript)
+        run: npm run type-check
+
+      - name: Run Unit Tests (Vitest)
+        run: npm test
+
+      - name: Production Application Build (Next.js)
+        run: npm run build
