@@ -1,6 +1,6 @@
 # 🎉 Utsav AI — Intelligent Celebration & Event Planner
 
-> **Prompt Wars Challenge 5 — Playbook Target: Rank 1 (100/100)**  
+> An intelligent, deterministic AI platform for planning culturally nuanced celebrations and milestone events.  
 > Production-grade, zero-cache, serverless-scalable AI platform for culturally nuanced celebrations, weddings, and milestone gatherings.
 
 ---
