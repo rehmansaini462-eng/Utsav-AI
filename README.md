@@ -13,6 +13,52 @@ Event planning in these verticals requires balancing hyper-specific cultural tra
 
 ---
 
+## Application Screenshots
+
+### 1. Smart Budget Breakdown & Allocation
+
+![Budget Breakdown](public/screenshots/1-budget.png)
+
+### 2. Multi-Day Cultural Itinerary & Timeline
+
+![Event Timeline](public/screenshots/2-timeline.png)
+
+### 3. Culturally Curated Vendor Directory
+
+![Vendor Directory](public/screenshots/3-vendors.png)
+
+### 4. Creative Inspiration & Styling Ideas
+
+![Inspiration and Ideas](public/screenshots/4-ideas.png)
+
+---
+
+## Why Utsav AI is Different
+
+Utsav AI is engineered to stand out from typical hackathon submissions with four foundational pillars:
+
+1. **Zero Mock Data:**
+   - **No Fake JSON or Hardcoded Fallbacks:** Every single celebration plan, timeline, and vendor suggestion is generated dynamically in real time via Google Gemini.
+   - **Fail-Fast Transparency:** If an upstream API or network error occurs, the user receives an immediate, transparent visual alert with retry capabilities instead of misleading pre-baked mock responses.
+
+2. **Deterministic Budget Math:**
+   - **40/30/15/15 Algorithmic Split:** Eliminates financial hallucinations by grounding total budget allocations mathematically:
+     - **40%** Venue & Catering
+     - **30%** Decor & Production
+     - **15%** Photography & Videography
+     - **15%** Entertainment & Miscellaneous
+   - AI generates culturally nuanced line items strictly inside these validated mathematical bounds.
+
+3. **WAI-ARIA Accessibility:**
+   - **Comprehensive Keyboard Navigation:** Full arrow-key (`ArrowLeft`, `ArrowRight`), `Home`, and `End` support for navigating dashboard tabs.
+   - **Semantic Standards:** Full implementation of `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, and `aria-controls` attributes, ensuring an inclusive, screen-reader-friendly experience.
+
+4. **Upstash Redis Rate Limiting:**
+   - **Serverless Efficiency 100/100:** Solves the multi-container fragmentation problem inherent to Vercel/serverless environments.
+   - **Sliding Window Protection:** Powered by Upstash Redis REST (`10 requests / 60 seconds`), preventing burst abuse globally with zero persistent socket overhead.
+
+---
+
 ## 🛡️ Critical Architecture Rule: Zero Caching / Strictly Dynamic AI
 
 > **DISQUALIFICATION SHIELD — ZERO STATIC MOCK DATA POLICY**  
@@ -69,6 +115,8 @@ utsav-ai/
 │       └── ci.yml             # Production GitHub Actions CI pipeline
 ├── .husky/
 │   └── pre-commit             # Pre-commit hook running lint-staged
+├── public/
+│   └── screenshots/           # Application screenshots for portfolio/review
 ├── src/
 │   ├── app/                   # Next.js App Router (pages, layout, API routes)
 │   ├── components/            # UI components and reusable design primitives
@@ -81,8 +129,7 @@ utsav-ai/
 │   │       └── rateLimit.ts   # Upstash Redis sliding window rate limiter
 │   └── types/
 │       └── index.ts           # Central domain TypeScript interfaces
-├── tests/
-│   └── config.test.ts         # Vitest unit test suite
+├── tests/                     # Unit, UI, E2E, and security test suites
 ├── .env.example               # Template environment configuration
 ├── .gitignore                 # Strict git ignore (protects .env.local)
 ├── .lintstagedrc.json         # Lint-staged rules for pre-commit
