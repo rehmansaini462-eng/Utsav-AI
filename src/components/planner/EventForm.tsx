@@ -68,13 +68,20 @@ export function EventForm({
         body: JSON.stringify(data),
       });
 
-      const result = await response.json();
+      let result: Partial<EventPlan> & { error?: string; data?: EventPlan } = {};
+      try {
+        result = await response.json();
+      } catch {
+        // Fallback if upstream proxy or server returned non-JSON payload
+      }
 
       if (!response.ok) {
         let errorMsg = result.error;
         if (!errorMsg) {
           if (response.status === 429) {
             errorMsg = "Rate limit exceeded. Please wait a moment before trying again.";
+          } else if (response.status === 504) {
+            errorMsg = "AI generation timed out. Please try again.";
           } else if (response.status === 500) {
             errorMsg =
               "AI generation failed. Please try again. Zero mock fallback policy is strictly enforced.";
@@ -89,7 +96,7 @@ export function EventForm({
       }
 
       // Successful dynamic plan received from Gemini 2.5
-      const plan: EventPlan = result.data || result;
+      const plan: EventPlan = (result.data || result) as EventPlan;
       onPlanGenerated(plan);
     } catch (err: unknown) {
       const msg =

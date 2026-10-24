@@ -3,7 +3,7 @@ import { checkRateLimit } from "@/lib/utils/rateLimit";
 import { EventRequestSchema, EventPlanSchema } from "@/types/planner";
 import { calculateBaseBudget } from "@/lib/utils/budgetLogic";
 import { buildEventPlanPrompt } from "@/lib/prompts/planner";
-import { generateJSON } from "@/lib/gemini";
+import { generateJSON, GeminiTimeoutError } from "@/lib/gemini";
 
 /**
  * ============================================================================
@@ -105,8 +105,24 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       { status: 200 },
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[generate-plan] Dynamic AI generation failed:", error);
+
+    const isTimeout =
+      error instanceof GeminiTimeoutError ||
+      (error instanceof Error &&
+        (error.message === "AI generation timed out. Please try again." ||
+          error.name === "GeminiTimeoutError" ||
+          error.name === "AbortError" ||
+          error.message.includes("AI generation timed out") ||
+          error.message.includes("The operation was aborted")));
+
+    if (isTimeout) {
+      return NextResponse.json(
+        { error: "AI generation timed out. Please try again." },
+        { status: 504 },
+      );
+    }
 
     // CRITICAL: Return 500 error with strict zero-mock policy
     return NextResponse.json({ error: "AI generation failed. Please try again." }, { status: 500 });

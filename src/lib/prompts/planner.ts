@@ -69,5 +69,6 @@ You must generate a single, strictly valid JSON object matching this exact schem
 === CRITICAL RULES ===
 1. STRICT JSON ONLY: Output ONLY the raw JSON object. Do NOT enclose in markdown code blocks (\`\`\`json or \`\`\`). Do NOT include any conversational prefix, explanations, or commentary.
 2. PERSONALIZED IDEAS: Provide at least 3 distinct, creative, and memorable ideas reflecting the celebration atmosphere of ${data.eventType} in ${data.location}.
-3. REALISTIC & PRACTICAL: All vendor questions, timeline milestones, and budget items must reflect real-world event coordination standards.`;
+3. REALISTIC & PRACTICAL: All vendor questions, timeline milestones, and budget items must reflect real-world event coordination standards.
+4. STRICT LENGTH LIMIT (<500 WORDS TOTAL): Be concise, direct, and punchy. To minimize generation latency and prevent timeouts, do not generate excessively long text for ideas or vendor questions. Keep the total content strictly under 500 words.`;
 }

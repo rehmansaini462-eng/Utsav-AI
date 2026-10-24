@@ -9,9 +9,9 @@ export const APP_DESCRIPTION = "Intelligent AI-driven Indian Celebration & Event
 
 /**
  * Gemini AI Model Selection
- * Using gemini-flash-latest for optimal speed, real-time dynamic response generation, and zero-cache evaluation.
+ * Using gemini-2.5-flash for optimal speed (<15s), real-time dynamic response generation, and zero-cache evaluation.
  */
-export const GEMINI_MODEL = "gemini-flash-latest" as const;
+export const GEMINI_MODEL = "gemini-2.5-flash" as const;
 
 /**
  * Rate Limiting Config

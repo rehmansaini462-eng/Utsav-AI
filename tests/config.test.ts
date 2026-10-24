@@ -5,7 +5,7 @@ import { envSchema } from "@/lib/env";
 describe("Utsav AI - Quality Foundation Tests", () => {
   it("should have correct application constants configured", () => {
     expect(APP_NAME).toBe("Utsav AI");
-    expect(GEMINI_MODEL).toBe("gemini-flash-latest");
+    expect(GEMINI_MODEL).toBe("gemini-2.5-flash");
     expect(RATE_LIMIT_CONFIG.MAX_REQUESTS).toBe(10);
     expect(RATE_LIMIT_CONFIG.WINDOW).toBe("60 s");
   });

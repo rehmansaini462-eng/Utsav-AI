@@ -4,10 +4,19 @@ import { EventRequestSchema, EventPlanSchema, EventPlan } from "@/types/planner"
 import { buildEventPlanPrompt } from "@/lib/prompts/planner";
 
 // Mock Gemini and RateLimiter modules for deterministic, isolated unit testing
-vi.mock("@/lib/gemini", () => ({
-  generateJSON: vi.fn(),
-  cleanJsonResponse: vi.fn((str: string) => str),
-}));
+vi.mock("@/lib/gemini", () => {
+  class GeminiTimeoutError extends Error {
+    constructor(message: string = "AI generation timed out. Please try again.") {
+      super(message);
+      this.name = "GeminiTimeoutError";
+    }
+  }
+  return {
+    generateJSON: vi.fn(),
+    cleanJsonResponse: vi.fn((str: string) => str),
+    GeminiTimeoutError,
+  };
+});
 
 vi.mock("@/lib/utils/rateLimit", () => ({
   checkRateLimit: vi.fn(),
@@ -398,6 +407,35 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("AI generation failed. Please try again.");
       // Confirm absolute zero mock data returned
+      expect(data.budgetBreakdown).toBeUndefined();
+      expect(data.timeline).toBeUndefined();
+      expect(data.personalizedIdeas).toBeUndefined();
+    });
+
+    it("should return HTTP 504 with timeout error message when Gemini AI times out", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: true,
+        limit: 10,
+        remaining: 7,
+        reset: Date.now() + 60000,
+      });
+
+      // Mock Gemini throwing timeout error
+      vi.mocked(generateJSON).mockRejectedValueOnce(
+        new Error("AI generation timed out. Please try again."),
+      );
+
+      const request = new Request("http://localhost:3000/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(504);
+      expect(data.error).toBe("AI generation timed out. Please try again.");
       expect(data.budgetBreakdown).toBeUndefined();
       expect(data.timeline).toBeUndefined();
       expect(data.personalizedIdeas).toBeUndefined();
