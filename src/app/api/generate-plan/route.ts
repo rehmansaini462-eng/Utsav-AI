@@ -72,14 +72,51 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // 4. Calculate baseline budget and build prompt
   const baseBudget = calculateBaseBudget(validation.data.budget);
-  const prompt = buildEventPlanPrompt({
+  let prompt = buildEventPlanPrompt({
     ...validation.data,
     baseBudget,
   });
 
-  // 5. Generate plan via Gemini AI
+  // 5. Generate plan via Gemini AI with Self-Correction retry loop
   try {
-    const plan = await generateJSON(prompt, EventPlanSchema);
+    let plan = null;
+    let attempts = 0;
+    const maxAttempts = 2;
+    const expectedTotal = validation.data.budget;
+
+    while (attempts < maxAttempts) {
+      try {
+        plan = await generateJSON(prompt, EventPlanSchema);
+
+        const calculatedTotal = plan.budgetBreakdown.reduce((sum, item) => sum + item.amount, 0);
+
+        if (Math.abs(calculatedTotal - expectedTotal) > 1) {
+          console.warn(
+            `[Self-Correction] Math mismatch. Expected: ${expectedTotal}, Got: ${calculatedTotal}`,
+          );
+          // Re-ask the AI to fix the math
+          prompt = `${prompt}\n\nCRITICAL CORRECTION: Your previous response had a math error. The sum of budgetBreakdown amounts was ${calculatedTotal}, but it MUST exactly equal ${expectedTotal}. Please fix the amounts and return the corrected JSON.`;
+          plan = null;
+          attempts++;
+          continue;
+        }
+        break; // Math is correct, exit loop
+      } catch (error) {
+        plan = null;
+        if (attempts < maxAttempts - 1) {
+          attempts++;
+          continue;
+        }
+        throw error; // If it fails twice, throw error
+      }
+    }
+
+    if (!plan) {
+      return NextResponse.json(
+        { error: "Failed to generate a valid plan after multiple attempts." },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json(
       {

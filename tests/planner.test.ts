@@ -256,6 +256,9 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       expect(prompt).toContain("vendorChecklist");
       expect(prompt).toContain("personalizedIdeas");
       expect(prompt).toContain("STRICT JSON ONLY");
+      expect(prompt).toContain(
+        "IMPORTANT: Keep descriptions brief. Max 1 sentence per item. Do not write long paragraphs.",
+      );
     });
   });
 
@@ -383,7 +386,7 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
         reset: Date.now() + 60000,
       });
 
-      vi.mocked(generateJSON).mockRejectedValueOnce(new Error("Gemini API failure"));
+      vi.mocked(generateJSON).mockRejectedValue(new Error("Gemini API failure"));
 
       const request = new Request("http://localhost:3000/api/generate-plan", {
         method: "POST",
@@ -400,6 +403,101 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       expect(data.budgetBreakdown).toBeUndefined();
       expect(data.timeline).toBeUndefined();
       expect(data.personalizedIdeas).toBeUndefined();
+    });
+
+    it("Successful self-correction on attempt 2 after attempt 1 had a math mismatch", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: true,
+        limit: 10,
+        remaining: 6,
+        reset: Date.now() + 60000,
+      });
+
+      const requestBody = {
+        eventType: "wedding",
+        budget: 500000,
+        guestCount: 150,
+        location: "Delhi",
+        preferences: "Grand traditional theme",
+      };
+
+      const invalidMathPlan: EventPlan = {
+        ...mockPlanData,
+        budgetBreakdown: [
+          { category: "Catering", amount: 200000, percentage: 40 },
+          { category: "Venue", amount: 151000, percentage: 30 },
+          { category: "Decor", amount: 75000, percentage: 15 },
+          { category: "Miscellaneous", amount: 75000, percentage: 15 },
+        ], // Total is 501,000, does not match expected budget 500,000
+      };
+
+      const validMathPlan: EventPlan = {
+        ...mockPlanData,
+        budgetBreakdown: [
+          { category: "Catering", amount: 200000, percentage: 40 },
+          { category: "Venue", amount: 150000, percentage: 30 },
+          { category: "Decor", amount: 75000, percentage: 15 },
+          { category: "Miscellaneous", amount: 75000, percentage: 15 },
+        ], // Total is 500,000, matches expected budget 500,000
+      };
+
+      // 1st attempt fails math check (501000 vs 500000), 2nd attempt returns valid plan (500000)
+      vi.mocked(generateJSON)
+        .mockResolvedValueOnce(invalidMathPlan)
+        .mockResolvedValueOnce(validMathPlan);
+
+      const request = new Request("http://localhost:3000/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(generateJSON).toHaveBeenCalledTimes(2);
+      expect(data.budgetBreakdown).toHaveLength(4);
+      const totalAmount = data.budgetBreakdown.reduce(
+        (sum: number, item: { amount: number }) => sum + item.amount,
+        0,
+      );
+      expect(totalAmount).toBe(500000);
+    });
+
+    it("should return HTTP 500 when AI generated budget breakdown fails math check after all attempts", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: true,
+        limit: 10,
+        remaining: 5,
+        reset: Date.now() + 60000,
+      });
+
+      const invalidMathPlan: EventPlan = {
+        ...mockPlanData,
+        budgetBreakdown: [
+          { category: "Catering", amount: 20000, percentage: 40 },
+          { category: "Venue", amount: 15000, percentage: 30 },
+          { category: "Decor", amount: 10000, percentage: 15 },
+          { category: "Miscellaneous", amount: 10000, percentage: 15 },
+        ], // Total is 55,000, does not match expected budget 100,000
+      };
+
+      vi.mocked(generateJSON).mockResolvedValue(invalidMathPlan);
+
+      const request = new Request("http://localhost:3000/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to generate a valid plan after multiple attempts.");
+      expect(generateJSON).toHaveBeenCalledTimes(2);
     });
   });
 });

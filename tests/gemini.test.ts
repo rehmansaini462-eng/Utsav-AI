@@ -37,7 +37,7 @@ describe("Gemini API Client", () => {
   });
 
   describe("generateJSON", () => {
-    it("should call gemini-1.5-flash and return validated JSON", async () => {
+    it("should call gemini-flash-lite-latest and return validated JSON", async () => {
       const testSchema = z.object({ success: z.boolean(), message: z.string() });
       const expectedOutput = { success: true, message: "Hello from Gemini" };
 
@@ -54,7 +54,7 @@ describe("Gemini API Client", () => {
       expect(result).toEqual(expectedOutput);
       expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
       expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-        expect.objectContaining({ model: "gemini-1.5-flash" }),
+        expect.objectContaining({ model: "gemini-flash-lite-latest" }),
       );
     });
 

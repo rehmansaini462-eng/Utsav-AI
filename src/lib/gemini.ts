@@ -34,7 +34,7 @@ export function getGeminiClient(): GoogleGenerativeAI {
 
 /**
  * Generates structured JSON output from the Gemini API and validates it against
- * a Zod schema. Uses the `gemini-1.5-flash` model with JSON response format.
+ * a Zod schema. Uses the `gemini-flash-lite-latest` model with JSON response format.
  *
  * @param prompt - The complete prompt string to send to Gemini
  * @param schema - A Zod schema used to validate and type the parsed response
@@ -46,11 +46,11 @@ export async function generateJSON<T>(prompt: string, schema: z.ZodType<T>): Pro
   const genAI = getGeminiClient();
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-flash-lite-latest",
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.7,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048,
     },
   });
 

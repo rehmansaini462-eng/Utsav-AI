@@ -54,5 +54,7 @@ ${budgetTable}
 === CRITICAL RULES ===
 1. STRICT JSON ONLY: Return raw JSON only adhering to the schema above. Do NOT use markdown code blocks (\`\`\`json or \`\`\`). No conversational text.
 2. TOTAL BUDGET ALIGNMENT: budgetBreakdown amounts must sum exactly to ${data.budget} and match the 4 categories (Catering, Venue, Decor, Miscellaneous).
-3. Provide practical milestones for the timeline, essential vendor questions, and personalized celebration ideas tailored to the event specifications.`;
+3. Provide practical milestones for the timeline, essential vendor questions, and personalized celebration ideas tailored to the event specifications.
+IMPORTANT: Keep the output concise so that the JSON is fully completed within the token limits. Ensure all brackets are properly closed.
+IMPORTANT: Keep descriptions brief. Max 1 sentence per item. Do not write long paragraphs.`;
 }
