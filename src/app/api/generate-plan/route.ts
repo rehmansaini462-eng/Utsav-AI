@@ -6,44 +6,25 @@ import { checkRateLimit } from "@/lib/utils/rateLimit";
 import { EventRequestSchema, EventPlanSchema } from "@/types/planner";
 import { calculateBaseBudget } from "@/lib/utils/budgetLogic";
 import { buildEventPlanPrompt } from "@/lib/prompts/planner";
-import { generateJSON, GeminiTimeoutError, RateLimitError } from "@/lib/gemini";
+import { generateJSON } from "@/lib/gemini";
 
 /**
- * ============================================================================
- * UTSAV AI - EVENT PLAN GENERATION ROUTE HANDLER
- * ============================================================================
+ * POST /api/generate-plan
  *
- * ### Architectural Pipeline:
- * 1. **Distributed Rate Limiting (Upstash Redis)**:
- *    - Enforces a sliding window limit of 10 requests per 60 seconds per client IP.
- *    - Safeguards upstream Gemini API quotas and protects serverless resources against abuse.
- *    - Responds with HTTP 429 and standard rate-limiting headers if quota is exceeded.
+ * Generates a personalized AI event plan using Gemini.
  *
- * 2. **Strict Zod Input Validation**:
- *    - Validates incoming payload against `EventRequestSchema`.
- *    - Enforces minimum budget threshold (>= 1000), valid eventType, positive guest count,
- *      and non-empty location strings.
- *    - Responds with HTTP 400 and explicit descriptive error messages on failure.
+ * Pipeline:
+ * 1. Rate limiting via Upstash Redis (10 req/60s per IP)
+ * 2. Zod input validation against EventRequestSchema
+ * 3. Deterministic budget allocation (40/30/15/15 split)
+ * 4. Live Gemini AI generation with Zod output validation
  *
- * 3. **Deterministic Algorithmic Budget Calculation**:
- *    - Executes `calculateBaseBudget` (pure function) to derive baseline allocations
- *      (40% Catering, 30% Venue, 15% Decor, 15% Misc).
- *
- * 4. **Live Dynamic Generative AI Synthesis (Gemini 2.5/Flash)**:
- *    - Calls `generateJSON` using `EventPlanSchema`.
- *    - Forces JSON output format from LLM and validates parsed structure at runtime.
- *    - ZERO CACHING: Every generation is dynamically computed in real-time.
- *
- * 5. **Zero Mock Data Resilience Policy**:
- *    - If Gemini API fails, network times out, or output schema fails validation,
- *      an HTTP 500 error is returned with "AI generation failed. Please try again."
- *    - CRITICAL: Under no circumstances does this endpoint return synthetic or mock fallback data.
- *
- * @param request - Web API Request object containing JSON payload
- * @returns {Promise<NextResponse>} JSON response containing the generated plan or descriptive error
+ * @param request - Incoming HTTP request with JSON payload
+ * @returns JSON response with generated plan or error
+ * @alignsWith Next.js App Router Route Handler conventions
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  // 1. Extract client IP and enforce sliding window rate limiting
+  // 1. Extract client IP and enforce rate limiting
   const forwardedFor = request.headers.get("x-forwarded-for");
   const realIp = request.headers.get("x-real-ip");
   const clientIp = forwardedFor
@@ -76,7 +57,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON in request body." }, { status: 400 });
   }
 
-  // 3. Validate input payload against strict Zod schema
+  // 3. Validate input payload against Zod schema
   const validation = EventRequestSchema.safeParse(body);
   if (!validation.success) {
     const errorMessage = validation.error.issues.map((issue) => issue.message).join("; ");
@@ -89,14 +70,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // 4. Calculate pure mathematical baseline budget and assemble prompt
+  // 4. Calculate baseline budget and build prompt
   const baseBudget = calculateBaseBudget(validation.data.budget);
   const prompt = buildEventPlanPrompt({
     ...validation.data,
     baseBudget,
   });
 
-  // 5. Invoke Gemini with runtime Zod output schema enforcement
+  // 5. Generate plan via Gemini AI
   try {
     const plan = await generateJSON(prompt, EventPlanSchema);
 
@@ -109,39 +90,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 200 },
     );
   } catch (error: unknown) {
-    console.error("[generate-plan] Dynamic AI generation failed:", error);
-
-    const isRateLimit =
-      error instanceof RateLimitError ||
-      (error instanceof Error &&
-        (error.name === "RateLimitError" ||
-          error.message === "Gemini API quota exceeded. Please try again later." ||
-          error.message.toLowerCase().includes("gemini api quota exceeded")));
-
-    if (isRateLimit) {
-      return NextResponse.json(
-        { error: "Gemini API quota exceeded. Please try again later." },
-        { status: 429 },
-      );
-    }
-
-    const isTimeout =
-      error instanceof GeminiTimeoutError ||
-      (error instanceof Error &&
-        (error.message === "AI generation timed out. Please try again." ||
-          error.name === "GeminiTimeoutError" ||
-          error.name === "AbortError" ||
-          error.message.includes("AI generation timed out") ||
-          error.message.includes("The operation was aborted")));
-
-    if (isTimeout) {
-      return NextResponse.json(
-        { error: "AI generation timed out. Please try again." },
-        { status: 504 },
-      );
-    }
-
-    // CRITICAL: Return 500 error with strict zero-mock policy
-    return NextResponse.json({ error: "AI generation failed. Please try again." }, { status: 500 });
+    console.error("[generate-plan] AI generation failed:", error);
+    return NextResponse.json(
+      { error: "Failed to generate plan. Please try again." },
+      { status: 500 },
+    );
   }
 }

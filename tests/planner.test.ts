@@ -5,23 +5,9 @@ import { buildEventPlanPrompt } from "@/lib/prompts/planner";
 
 // Mock Gemini and RateLimiter modules for deterministic, isolated unit testing
 vi.mock("@/lib/gemini", () => {
-  class GeminiTimeoutError extends Error {
-    constructor(message: string = "AI generation timed out. Please try again.") {
-      super(message);
-      this.name = "GeminiTimeoutError";
-    }
-  }
-  class RateLimitError extends Error {
-    constructor(message: string = "Gemini API quota exceeded. Please try again later.") {
-      super(message);
-      this.name = "RateLimitError";
-    }
-  }
   return {
     generateJSON: vi.fn(),
     cleanJsonResponse: vi.fn((str: string) => str),
-    GeminiTimeoutError,
-    RateLimitError,
   };
 });
 
@@ -389,7 +375,7 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       expect(generateJSON).not.toHaveBeenCalled();
     });
 
-    it("should return HTTP 500 with exact error message when Gemini AI fails (Zero Mock Data enforcement)", async () => {
+    it("should return HTTP 500 when Gemini AI fails (zero mock data enforcement)", async () => {
       vi.mocked(checkRateLimit).mockResolvedValueOnce({
         success: true,
         limit: 10,
@@ -397,10 +383,7 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
         reset: Date.now() + 60000,
       });
 
-      // Mock Gemini throwing an unexpected API or quota error
-      vi.mocked(generateJSON).mockRejectedValueOnce(
-        new Error("Gemini quota exceeded / network timeout"),
-      );
+      vi.mocked(generateJSON).mockRejectedValueOnce(new Error("Gemini API failure"));
 
       const request = new Request("http://localhost:3000/api/generate-plan", {
         method: "POST",
@@ -412,65 +395,11 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe("AI generation failed. Please try again.");
-      // Confirm absolute zero mock data returned
+      expect(data.error).toBe("Failed to generate plan. Please try again.");
+      // Confirm zero mock data returned
       expect(data.budgetBreakdown).toBeUndefined();
       expect(data.timeline).toBeUndefined();
       expect(data.personalizedIdeas).toBeUndefined();
-    });
-
-    it("should return HTTP 504 with timeout error message when Gemini AI times out", async () => {
-      vi.mocked(checkRateLimit).mockResolvedValueOnce({
-        success: true,
-        limit: 10,
-        remaining: 7,
-        reset: Date.now() + 60000,
-      });
-
-      // Mock Gemini throwing timeout error
-      vi.mocked(generateJSON).mockRejectedValueOnce(
-        new Error("AI generation timed out. Please try again."),
-      );
-
-      const request = new Request("http://localhost:3000/api/generate-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validBody),
-      });
-
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(504);
-      expect(data.error).toBe("AI generation timed out. Please try again.");
-      expect(data.budgetBreakdown).toBeUndefined();
-      expect(data.timeline).toBeUndefined();
-      expect(data.personalizedIdeas).toBeUndefined();
-    });
-
-    it("should return HTTP 429 when Gemini AI quota is exceeded (RateLimitError)", async () => {
-      vi.mocked(checkRateLimit).mockResolvedValueOnce({
-        success: true,
-        limit: 10,
-        remaining: 7,
-        reset: Date.now() + 60000,
-      });
-
-      const error = new Error("Gemini API quota exceeded. Please try again later.");
-      error.name = "RateLimitError";
-      vi.mocked(generateJSON).mockRejectedValueOnce(error);
-
-      const request = new Request("http://localhost:3000/api/generate-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validBody),
-      });
-
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(429);
-      expect(data.error).toBe("Gemini API quota exceeded. Please try again later.");
     });
   });
 });

@@ -21,18 +21,6 @@ export interface EventFormProps {
   isLoading?: boolean;
 }
 
-export class TimeoutError extends Error {
-  constructor(message = "Network timeout. Please check your internet connection and try again.") {
-    super(message);
-    this.name = "TimeoutError";
-  }
-}
-
-/**
- * EventForm Component
- * Accessible client-side celebration planning form powered by react-hook-form
- * and Day 1 Zod validation schema. Strictly enforces Zero Mock Data policy.
- */
 export function EventForm({
   onPlanGenerated,
   onError,
@@ -67,84 +55,32 @@ export function EventForm({
     setInternalLoading(true);
     onLoadingChange?.(true);
 
-    const controller = new AbortController();
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        controller.abort();
-        reject(
-          new TimeoutError("Network timeout. Please check your internet connection and try again."),
-        );
-      }, 60000);
-    });
-    // Prevent unhandled rejection warning if fetch settles first
-    timeoutPromise.catch(() => {});
-
     try {
-      const fetchPromise = fetch("/api/generate-plan", {
+      const response = await fetch("/api/generate-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
-        signal: controller.signal,
       });
 
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-      let result: Partial<EventPlan> & { error?: string; data?: EventPlan } = {};
-      try {
-        result = await response.json();
-      } catch {
-        // Fallback if upstream proxy or server returned non-JSON payload
-      }
+      const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        let errorMsg = result.error;
-        if (!errorMsg) {
-          if (response.status === 429) {
-            errorMsg = "Rate limit exceeded. Please wait a moment before trying again.";
-          } else if (response.status === 504) {
-            errorMsg = "AI generation timed out. Please try again.";
-          } else if (response.status === 500) {
-            errorMsg =
-              "AI generation failed. Please try again. Zero mock fallback policy is strictly enforced.";
-          } else {
-            errorMsg = `Planning request failed with status ${response.status}.`;
-          }
-        }
+        const errorMsg = result.error || "Failed to generate plan. Please try again.";
         setApiError(errorMsg);
         onError?.(errorMsg);
-        // CRITICAL: Strictly zero mock fallback on failure
         return;
       }
 
-      // Successful dynamic plan received from Gemini 2.5
+      // Successful dynamic plan received from Gemini
       const plan: EventPlan = (result.data || result) as EventPlan;
       onPlanGenerated(plan);
-    } catch (err: unknown) {
-      let msg: string;
-      const errorName = (err as { name?: string })?.name;
-      if (
-        err instanceof TimeoutError ||
-        errorName === "TimeoutError" ||
-        errorName === "AbortError"
-      ) {
-        msg = "Network timeout. Please check your internet connection and try again.";
-      } else if (err instanceof TypeError) {
-        msg = "Network error. Please check your internet connection and try again.";
-      } else if (err instanceof Error) {
-        msg = err.message;
-      } else {
-        msg = "Network error. Please check your internet connection and try again.";
-      }
+    } catch {
+      const msg = "Network error. Please check your internet connection and try again.";
       setApiError(msg);
       onError?.(msg);
     } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       setInternalLoading(false);
       onLoadingChange?.(false);
     }

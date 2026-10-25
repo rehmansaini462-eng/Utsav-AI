@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
-import { MODELS, generateJSON, RateLimitError, GeminiTimeoutError } from "@/lib/gemini";
+import { generateJSON, cleanJsonResponse } from "@/lib/gemini";
 
 // Mock @google/generative-ai
 const mockGenerateContent = vi.fn();
@@ -14,144 +14,102 @@ vi.mock("@google/generative-ai", () => {
   };
 });
 
-describe("Gemini API Client & Fallback Mechanism", () => {
+describe("Gemini API Client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should have currently active models configured in exact fallback priority", () => {
-    expect(MODELS).toEqual(["gemini-flash-lite-latest", "gemini-2.5-flash"]);
-  });
-
-  it("should succeed on the first model without fallback when it responds with valid JSON", async () => {
-    const testSchema = z.object({ success: z.boolean(), message: z.string() });
-    const expectedOutput = { success: true, message: "Hello from gemini-flash-lite-latest" };
-
-    mockGetGenerativeModel.mockReturnValue({
-      generateContent: mockGenerateContent.mockResolvedValueOnce({
-        response: {
-          text: () => JSON.stringify(expectedOutput),
-        },
-      }),
+  describe("cleanJsonResponse", () => {
+    it("should strip ```json fences from response", () => {
+      const raw = '```json\n{"key": "value"}\n```';
+      expect(cleanJsonResponse(raw)).toBe('{"key": "value"}');
     });
 
-    const result = await generateJSON("test prompt", testSchema);
+    it("should strip plain ``` fences from response", () => {
+      const raw = '```\n{"key": "value"}\n```';
+      expect(cleanJsonResponse(raw)).toBe('{"key": "value"}');
+    });
 
-    expect(result).toEqual(expectedOutput);
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
-    expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
-    );
+    it("should return already-clean JSON unchanged", () => {
+      const raw = '{"key": "value"}';
+      expect(cleanJsonResponse(raw)).toBe('{"key": "value"}');
+    });
   });
 
-  it("should log console.warn and fallback to next model when the first model fails", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const testSchema = z.object({ plan: z.string() });
-    const expectedOutput = { plan: "Generated via gemini-2.5-flash" };
+  describe("generateJSON", () => {
+    it("should call gemini-1.5-flash and return validated JSON", async () => {
+      const testSchema = z.object({ success: z.boolean(), message: z.string() });
+      const expectedOutput = { success: true, message: "Hello from Gemini" };
 
-    // First model fails (e.g. 404 Deprecated/Not Found)
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi
-        .fn()
-        .mockRejectedValueOnce(
-          new Error(
-            "[404 Not Found] models/gemini-flash-lite-latest is not found for API version v1beta",
-          ),
-        ),
-    }));
+      mockGetGenerativeModel.mockReturnValue({
+        generateContent: mockGenerateContent.mockResolvedValueOnce({
+          response: {
+            text: () => JSON.stringify(expectedOutput),
+          },
+        }),
+      });
 
-    // Second (and last) model succeeds
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi.fn().mockResolvedValueOnce({
-        response: {
-          text: () => JSON.stringify(expectedOutput),
-        },
-      }),
-    }));
+      const result = await generateJSON("test prompt", testSchema);
 
-    const result = await generateJSON("test prompt", testSchema);
+      expect(result).toEqual(expectedOutput);
+      expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
+      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gemini-1.5-flash" }),
+      );
+    });
 
-    expect(result).toEqual(expectedOutput);
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
-    expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
-    );
-    expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ model: "gemini-2.5-flash" }),
-    );
+    it("should throw Error when Gemini returns empty response", async () => {
+      const testSchema = z.object({ value: z.number() });
 
-    // Verify fallback logging
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[Gemini] Model 'gemini-flash-lite-latest' failed, trying next fallback model:",
-      "[404 Not Found] models/gemini-flash-lite-latest is not found for API version v1beta",
-    );
+      mockGetGenerativeModel.mockReturnValue({
+        generateContent: mockGenerateContent.mockResolvedValueOnce({
+          response: {
+            text: () => "",
+          },
+        }),
+      });
 
-    warnSpy.mockRestore();
-  });
+      await expect(generateJSON("test prompt", testSchema)).rejects.toThrow(
+        "Gemini returned an empty response",
+      );
+    });
 
-  it("should cascade through all models if earlier ones fail and throw last error when all exhausted", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const testSchema = z.object({ value: z.number() });
+    it("should throw Error when Gemini API call fails", async () => {
+      const testSchema = z.object({ value: z.number() });
 
-    // Model 1 fails
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi.fn().mockRejectedValueOnce(new Error("Model 1 unavailable")),
-    }));
-    // Model 2 fails
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi.fn().mockRejectedValueOnce(new Error("Model 2 internal server error")),
-    }));
+      mockGetGenerativeModel.mockReturnValue({
+        generateContent: mockGenerateContent.mockRejectedValueOnce(new Error("API request failed")),
+      });
 
-    await expect(generateJSON("test prompt", testSchema)).rejects.toThrow(
-      "Model 2 internal server error",
-    );
+      await expect(generateJSON("test prompt", testSchema)).rejects.toThrow("API request failed");
+    });
 
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
-    expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
-    );
-    expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ model: "gemini-2.5-flash" }),
-    );
+    it("should throw when response fails Zod validation", async () => {
+      const testSchema = z.object({ requiredField: z.string() });
 
-    expect(warnSpy).toHaveBeenCalledTimes(2);
-    warnSpy.mockRestore();
-  });
+      mockGetGenerativeModel.mockReturnValue({
+        generateContent: mockGenerateContent.mockResolvedValueOnce({
+          response: {
+            text: () => JSON.stringify({ wrongField: 123 }),
+          },
+        }),
+      });
 
-  it("should throw RateLimitError immediately without fallback when quota (429) is hit", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const testSchema = z.object({ value: z.number() });
+      await expect(generateJSON("test prompt", testSchema)).rejects.toThrow();
+    });
 
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi
-        .fn()
-        .mockRejectedValueOnce(new Error("Resource has been exhausted (e.g. check quota). [429]")),
-    }));
+    it("should throw when response contains invalid JSON", async () => {
+      const testSchema = z.object({ value: z.number() });
 
-    await expect(generateJSON("test prompt", testSchema)).rejects.toThrow(RateLimitError);
+      mockGetGenerativeModel.mockReturnValue({
+        generateContent: mockGenerateContent.mockResolvedValueOnce({
+          response: {
+            text: () => "this is not json at all",
+          },
+        }),
+      });
 
-    // Should NOT have attempted fallback models because quota affects the entire API key
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
-    expect(warnSpy).not.toHaveBeenCalled();
-
-    warnSpy.mockRestore();
-  });
-
-  it("should throw GeminiTimeoutError when AbortController signal aborts", async () => {
-    const testSchema = z.object({ value: z.number() });
-
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi.fn().mockImplementation(() => {
-        const error = new Error("This operation was aborted");
-        error.name = "AbortError";
-        return Promise.reject(error);
-      }),
-    }));
-
-    await expect(generateJSON("test prompt", testSchema)).rejects.toThrow(GeminiTimeoutError);
+      await expect(generateJSON("test prompt", testSchema)).rejects.toThrow();
+    });
   });
 });
