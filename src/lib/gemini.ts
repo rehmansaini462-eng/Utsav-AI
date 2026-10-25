@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { env } from "@/lib/env";
-export const MODELS = ["gemini-1.5-flash"] as const;
+export const MODELS = ["gemini-flash-lite-latest", "gemini-2.5-flash"] as const;
 
 /**
  * Strips potential markdown code fence wrappers from raw LLM responses.
@@ -52,8 +52,8 @@ export class RateLimitError extends Error {
  *
  * ZERO CACHING: Every call hits the Gemini API live in real-time.
  * ZERO MOCK DATA: Never falls back to static fixtures or mock payloads.
- * STRICT TIMEOUT: Enforces a 20-second AbortController timeout to prevent Vercel execution timeouts.
- * MODEL SELECTION: Uses gemini-1.5-flash for fast and reliable execution.
+ * STRICT TIMEOUT: Enforces a 55-second AbortController timeout to prevent execution timeouts.
+ * MODEL SELECTION: Uses active Gemini Flash models (gemini-flash-latest, gemini-2.0-flash, gemini-2.5-flash) with fallback.
  *
  * @param prompt - Formatted system and user prompt
  * @param schema - Zod validation schema for parsing and guaranteeing output integrity
@@ -68,7 +68,7 @@ export async function generateJSON<T>(
   schema: z.ZodType<T>,
   options?: { timeoutMs?: number },
 ): Promise<T> {
-  const timeoutMs = options?.timeoutMs ?? 20000;
+  const timeoutMs = options?.timeoutMs ?? 55000;
   const genAI = getGeminiClient();
 
   const controller = new AbortController();
@@ -90,7 +90,7 @@ export async function generateJSON<T>(
           generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.7,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 1024,
           },
         });
 

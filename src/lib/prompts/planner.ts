@@ -55,8 +55,10 @@ ${budgetTable}
 1. STRICT JSON ONLY: Return raw JSON only. Do NOT use markdown code blocks (\`\`\`json or \`\`\`). No conversational text.
 2. BRIEF DESCRIPTIONS: Keep all descriptions brief (max 1 sentence per item).
 3. OUTPUT LIMITS:
-   - max 3 timeline phases (1-2 short tasks per phase)
-   - max 3 vendor questions (across vendors)
-   - exactly 3 personalizedIdeas (max 3 ideas, 1 sentence each)
+   - "budgetBreakdown": Keep exactly 4 categories (Catering, Venue, Decor, Misc).
+   - "timeline": MAX 2 phases. Each phase max 2 short tasks.
+   - "vendorChecklist": MAX 2 vendors. Each with max 2 short questions.
+   - "personalizedIdeas": Exactly 2 ideas, max 1 sentence each.
+   - STRICT LIMIT: The total JSON output MUST be under 250 words to prevent timeouts.
 4. TOTAL BUDGET ALIGNMENT: budgetBreakdown amounts must sum exactly to ${data.budget}.`;
 }

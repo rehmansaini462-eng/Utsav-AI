@@ -61,7 +61,8 @@ export function EventForm({
     },
   });
 
-  const onSubmit = async (data: EventRequest) => {
+  const onSubmit = async (data: EventRequest, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
     setApiError(null);
     setInternalLoading(true);
     onLoadingChange?.(true);
@@ -75,7 +76,7 @@ export function EventForm({
         reject(
           new TimeoutError("Network timeout. Please check your internet connection and try again."),
         );
-      }, 45000);
+      }, 60000);
     });
     // Prevent unhandled rejection warning if fetch settles first
     timeoutPromise.catch(() => {});

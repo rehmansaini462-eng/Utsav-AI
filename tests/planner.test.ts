@@ -222,17 +222,17 @@ describe("Day 1: Utsav AI Core Logic & GenAI Pipeline", () => {
         expect(result.success).toBe(true);
       });
 
-      it("should reject EventPlan with fewer than 3 personalized ideas", () => {
+      it("should reject EventPlan with fewer than 2 personalized ideas", () => {
         const invalidPlan = {
           ...mockPlanData,
-          personalizedIdeas: ["Idea 1", "Idea 2"], // Only 2 ideas
+          personalizedIdeas: ["Idea 1"], // Only 1 idea
         };
 
         const result = EventPlanSchema.safeParse(invalidPlan);
         expect(result.success).toBe(false);
         if (!result.success) {
           const ideaIssue = result.error.issues.find((i) => i.path.includes("personalizedIdeas"));
-          expect(ideaIssue?.message).toContain("At least 3 personalized ideas are required");
+          expect(ideaIssue?.message).toContain("At least 2 personalized ideas are required");
         }
       });
 

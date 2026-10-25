@@ -73,7 +73,7 @@ export const EventPlanSchema = z.object({
   vendorChecklist: z.array(VendorChecklistItemSchema),
   personalizedIdeas: z
     .array(z.string().min(1, "Idea description cannot be empty"))
-    .min(3, "At least 3 personalized ideas are required"),
+    .min(2, "At least 2 personalized ideas are required"),
 });
 
 export type EventPlan = z.infer<typeof EventPlanSchema>;
