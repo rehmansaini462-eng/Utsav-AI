@@ -26,12 +26,6 @@ export default function Home() {
     );
   };
 
-  const handleError = (errorMsg: string) => {
-    setApiError(errorMsg);
-    setPoliteAnnouncement("");
-    setAssertiveAnnouncement(`Planning error occurred: ${errorMsg}`);
-  };
-
   const handleReset = () => {
     setPlan(null);
     setApiError(null);

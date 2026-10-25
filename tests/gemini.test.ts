@@ -20,12 +20,12 @@ describe("Gemini API Client & Fallback Mechanism", () => {
   });
 
   it("should have currently active models configured in exact fallback priority", () => {
-    expect(MODELS).toEqual(["gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash"]);
+    expect(MODELS).toEqual(["gemini-flash-lite-latest", "gemini-2.5-flash"]);
   });
 
   it("should succeed on the first model without fallback when it responds with valid JSON", async () => {
     const testSchema = z.object({ success: z.boolean(), message: z.string() });
-    const expectedOutput = { success: true, message: "Hello from gemini-flash-latest" };
+    const expectedOutput = { success: true, message: "Hello from gemini-flash-lite-latest" };
 
     mockGetGenerativeModel.mockReturnValue({
       generateContent: mockGenerateContent.mockResolvedValueOnce({
@@ -40,14 +40,14 @@ describe("Gemini API Client & Fallback Mechanism", () => {
     expect(result).toEqual(expectedOutput);
     expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
     expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-flash-latest" }),
+      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
     );
   });
 
   it("should log console.warn and fallback to next model when the first model fails", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const testSchema = z.object({ plan: z.string() });
-    const expectedOutput = { plan: "Generated via gemini-2.0-flash" };
+    const expectedOutput = { plan: "Generated via gemini-2.5-flash" };
 
     // First model fails (e.g. 404 Deprecated/Not Found)
     mockGetGenerativeModel.mockImplementationOnce(() => ({
@@ -55,12 +55,12 @@ describe("Gemini API Client & Fallback Mechanism", () => {
         .fn()
         .mockRejectedValueOnce(
           new Error(
-            "[404 Not Found] models/gemini-flash-latest is not found for API version v1beta",
+            "[404 Not Found] models/gemini-flash-lite-latest is not found for API version v1beta",
           ),
         ),
     }));
 
-    // Second model succeeds
+    // Second (and last) model succeeds
     mockGetGenerativeModel.mockImplementationOnce(() => ({
       generateContent: vi.fn().mockResolvedValueOnce({
         response: {
@@ -75,26 +75,25 @@ describe("Gemini API Client & Fallback Mechanism", () => {
     expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
     expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ model: "gemini-flash-latest" }),
+      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
     );
     expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ model: "gemini-2.0-flash" }),
+      expect.objectContaining({ model: "gemini-2.5-flash" }),
     );
 
     // Verify fallback logging
     expect(warnSpy).toHaveBeenCalledWith(
-      "[Gemini] Model 'gemini-flash-latest' failed, trying next fallback model:",
-      "[404 Not Found] models/gemini-flash-latest is not found for API version v1beta",
+      "[Gemini] Model 'gemini-flash-lite-latest' failed, trying next fallback model:",
+      "[404 Not Found] models/gemini-flash-lite-latest is not found for API version v1beta",
     );
 
     warnSpy.mockRestore();
   });
 
-  it("should cascade through all models if earlier ones fail and succeed on third model", async () => {
+  it("should cascade through all models if earlier ones fail and throw last error when all exhausted", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const testSchema = z.object({ value: z.number() });
-    const expectedOutput = { value: 42 };
 
     // Model 1 fails
     mockGetGenerativeModel.mockImplementationOnce(() => ({
@@ -104,29 +103,18 @@ describe("Gemini API Client & Fallback Mechanism", () => {
     mockGetGenerativeModel.mockImplementationOnce(() => ({
       generateContent: vi.fn().mockRejectedValueOnce(new Error("Model 2 internal server error")),
     }));
-    // Model 3 succeeds
-    mockGetGenerativeModel.mockImplementationOnce(() => ({
-      generateContent: vi.fn().mockResolvedValueOnce({
-        response: {
-          text: () => JSON.stringify(expectedOutput),
-        },
-      }),
-    }));
 
-    const result = await generateJSON("test prompt", testSchema);
+    await expect(generateJSON("test prompt", testSchema)).rejects.toThrow(
+      "Model 2 internal server error",
+    );
 
-    expect(result).toEqual(expectedOutput);
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(3);
+    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
     expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ model: "gemini-flash-latest" }),
+      expect.objectContaining({ model: "gemini-flash-lite-latest" }),
     );
     expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ model: "gemini-2.0-flash" }),
-    );
-    expect(mockGetGenerativeModel).toHaveBeenNthCalledWith(
-      3,
       expect.objectContaining({ model: "gemini-2.5-flash" }),
     );
 
